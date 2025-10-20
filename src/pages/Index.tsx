@@ -40,7 +40,17 @@ const Index = () => {
     
     if (count < 4) count = 4;
     
-    const actualSpacing = perimeter / count;
+    let actualSpacing = perimeter / count;
+    
+    while (actualSpacing < minSpacing && count > 4) {
+      count--;
+      actualSpacing = perimeter / count;
+    }
+    
+    while (actualSpacing > maxSpacing) {
+      count++;
+      actualSpacing = perimeter / count;
+    }
     
     const positions: number[] = [];
     for (let i = 0; i < count; i++) {

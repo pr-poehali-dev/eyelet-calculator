@@ -6,6 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 interface CalculationResult {
   count: number;
@@ -63,6 +67,112 @@ const Index = () => {
     } else {
       return { x: 0, y: h - (distance - 2 * w - h), side: 'left' };
     }
+  };
+
+  const exportToPDF = () => {
+    if (!result) return;
+
+    const doc = new jsPDF();
+    const w = parseFloat(width);
+    const h = parseFloat(height);
+
+    doc.setFontSize(20);
+    doc.text('Расчет люверсов', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Размеры изделия: ${width} × ${height} мм`, 20, 35);
+    doc.text(`Периметр: ${result.perimeter} мм`, 20, 45);
+    doc.text(`Количество люверсов: ${result.count} шт`, 20, 55);
+    doc.text(`Шаг установки: ${result.spacing} мм`, 20, 65);
+
+    doc.setFontSize(14);
+    doc.text('Координаты для разметки:', 20, 80);
+
+    doc.setFontSize(10);
+    let yPos = 90;
+    result.positions.forEach((pos, idx) => {
+      const location = getPositionOnPerimeter(pos);
+      let text = `№${idx + 1}: `;
+      
+      if (location.side === 'top') {
+        text += `Верхняя сторона - ${Math.round(location.x)} мм от левого края`;
+      } else if (location.side === 'right') {
+        text += `Правая сторона - ${Math.round(location.y)} мм от верхнего края`;
+      } else if (location.side === 'bottom') {
+        text += `Нижняя сторона - ${Math.round(w - location.x)} мм от правого края`;
+      } else {
+        text += `Левая сторона - ${Math.round(h - location.y)} мм от нижнего края`;
+      }
+      
+      doc.text(text, 20, yPos);
+      yPos += 6;
+      
+      if (yPos > 280 && idx < result.positions.length - 1) {
+        doc.addPage();
+        yPos = 20;
+      }
+    });
+
+    doc.save(`lyversy_${width}x${height}.pdf`);
+    toast.success('PDF чертеж успешно сохранен');
+  };
+
+  const exportToExcel = () => {
+    if (!result) return;
+
+    const w = parseFloat(width);
+    const h = parseFloat(height);
+
+    const data = result.positions.map((pos, idx) => {
+      const location = getPositionOnPerimeter(pos);
+      let side = '';
+      let distance = 0;
+      let reference = '';
+      
+      if (location.side === 'top') {
+        side = 'Верхняя';
+        distance = Math.round(location.x);
+        reference = 'от левого края';
+      } else if (location.side === 'right') {
+        side = 'Правая';
+        distance = Math.round(location.y);
+        reference = 'от верхнего края';
+      } else if (location.side === 'bottom') {
+        side = 'Нижняя';
+        distance = Math.round(w - location.x);
+        reference = 'от правого края';
+      } else {
+        side = 'Левая';
+        distance = Math.round(h - location.y);
+        reference = 'от нижнего края';
+      }
+      
+      return {
+        '№': idx + 1,
+        'Сторона': side,
+        'Расстояние (мм)': distance,
+        'Отсчет': reference,
+        'X (мм)': Math.round(location.x),
+        'Y (мм)': Math.round(location.y)
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Разметка');
+
+    const summaryData = [
+      { 'Параметр': 'Ширина изделия', 'Значение': `${width} мм` },
+      { 'Параметр': 'Высота изделия', 'Значение': `${height} мм` },
+      { 'Параметр': 'Периметр', 'Значение': `${result.perimeter} мм` },
+      { 'Параметр': 'Количество люверсов', 'Значение': `${result.count} шт` },
+      { 'Параметр': 'Шаг установки', 'Значение': `${result.spacing} мм` },
+    ];
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Параметры');
+
+    XLSX.writeFile(wb, `lyversy_${width}x${height}.xlsx`);
+    toast.success('Excel файл успешно сохранен');
   };
 
   return (
@@ -135,13 +245,14 @@ const Index = () => {
                       Шаг установки: {minSpacing}-{maxSpacing} мм
                     </AlertDescription>
                   </Alert>
-                  <button
+                  <Button
                     onClick={calculateGrommets}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
+                    className="w-full font-medium py-6 text-base"
+                    size="lg"
                   >
                     <Icon name="Play" size={18} />
                     Рассчитать
-                  </button>
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -193,6 +304,25 @@ const Index = () => {
                           );
                         })}
                       </div>
+                    </div>
+                    <Separator />
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={exportToPDF}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <Icon name="FileDown" size={18} className="mr-2" />
+                        Скачать PDF
+                      </Button>
+                      <Button
+                        onClick={exportToExcel}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <Icon name="Table" size={18} className="mr-2" />
+                        Экспорт в Excel
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

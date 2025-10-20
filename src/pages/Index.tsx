@@ -21,8 +21,9 @@ interface CalculationResult {
 const Index = () => {
   const [width, setWidth] = useState<string>('1000');
   const [height, setHeight] = useState<string>('2000');
-  const [minSpacing] = useState<number>(30);
-  const [maxSpacing] = useState<number>(35);
+  const [minSpacing] = useState<number>(300);
+  const [maxSpacing] = useState<number>(350);
+  const [grommetsType, setGrommetsType] = useState<string>('16');
   const [result, setResult] = useState<CalculationResult | null>(null);
 
   const calculateGrommets = () => {
@@ -81,31 +82,38 @@ const Index = () => {
     
     doc.setFontSize(12);
     doc.text(`Размеры изделия: ${width} × ${height} мм`, 20, 35);
-    doc.text(`Периметр: ${result.perimeter} мм`, 20, 45);
-    doc.text(`Количество люверсов: ${result.count} шт`, 20, 55);
-    doc.text(`Шаг установки: ${result.spacing} мм`, 20, 65);
+    doc.text(`Тип люверса: ${grommetsType === '16' ? 'Ø 16 мм' : '42×22 мм'}`, 20, 42);
+    doc.text(`Периметр: ${result.perimeter} мм`, 20, 49);
+    doc.text(`Количество люверсов: ${result.count} шт`, 20, 56);
+    doc.text(`Шаг установки: ${result.spacing} мм`, 20, 63);
 
     doc.setFontSize(14);
-    doc.text('Координаты для разметки:', 20, 80);
+    doc.text('Координаты для разметки:', 20, 75);
 
-    doc.setFontSize(10);
-    let yPos = 90;
+    doc.setFontSize(9);
+    let yPos = 85;
     result.positions.forEach((pos, idx) => {
       const location = getPositionOnPerimeter(pos);
+      const nextPos = result.positions[(idx + 1) % result.positions.length];
+      let distanceToNext = nextPos - pos;
+      if (distanceToNext < 0) distanceToNext += result.perimeter;
+      
       let text = `№${idx + 1}: `;
       
       if (location.side === 'top') {
-        text += `Верхняя сторона - ${Math.round(location.x)} мм от левого края`;
+        text += `Верх - ${Math.round(location.x)} мм от левого края`;
       } else if (location.side === 'right') {
-        text += `Правая сторона - ${Math.round(location.y)} мм от верхнего края`;
+        text += `Право - ${Math.round(location.y)} мм от верхнего края`;
       } else if (location.side === 'bottom') {
-        text += `Нижняя сторона - ${Math.round(w - location.x)} мм от правого края`;
+        text += `Низ - ${Math.round(w - location.x)} мм от правого края`;
       } else {
-        text += `Левая сторона - ${Math.round(h - location.y)} мм от нижнего края`;
+        text += `Лево - ${Math.round(h - location.y)} мм от нижнего края`;
       }
       
+      text += ` | До №${((idx + 1) % result.positions.length) + 1}: ${Math.round(distanceToNext)} мм`;
+      
       doc.text(text, 20, yPos);
-      yPos += 6;
+      yPos += 5;
       
       if (yPos > 280 && idx < result.positions.length - 1) {
         doc.addPage();
@@ -147,11 +155,16 @@ const Index = () => {
         reference = 'от нижнего края';
       }
       
+      const nextPos = result.positions[(idx + 1) % result.positions.length];
+      let distanceToNext = nextPos - pos;
+      if (distanceToNext < 0) distanceToNext += result.perimeter;
+      
       return {
         '№': idx + 1,
         'Сторона': side,
-        'Расстояние (мм)': distance,
+        'Расстояние от края (мм)': distance,
         'Отсчет': reference,
+        'До следующего (мм)': Math.round(distanceToNext),
         'X (мм)': Math.round(location.x),
         'Y (мм)': Math.round(location.y)
       };
@@ -164,6 +177,7 @@ const Index = () => {
     const summaryData = [
       { 'Параметр': 'Ширина изделия', 'Значение': `${width} мм` },
       { 'Параметр': 'Высота изделия', 'Значение': `${height} мм` },
+      { 'Параметр': 'Тип люверса', 'Значение': grommetsType === '16' ? 'Ø 16 мм' : '42×22 мм' },
       { 'Параметр': 'Периметр', 'Значение': `${result.perimeter} мм` },
       { 'Параметр': 'Количество люверсов', 'Значение': `${result.count} шт` },
       { 'Параметр': 'Шаг установки', 'Значение': `${result.spacing} мм` },
@@ -239,6 +253,18 @@ const Index = () => {
                       className="font-mono"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grommetType">Тип люверса</Label>
+                    <select
+                      id="grommetType"
+                      value={grommetsType}
+                      onChange={(e) => setGrommetsType(e.target.value)}
+                      className="w-full p-2 border border-input bg-background rounded-md"
+                    >
+                      <option value="16">Ø 16 мм</option>
+                      <option value="42x22">42×22 мм</option>
+                    </select>
+                  </div>
                   <Alert>
                     <Icon name="Info" size={16} />
                     <AlertDescription>
@@ -289,17 +315,24 @@ const Index = () => {
                         Первые 4 позиции для разметки
                       </div>
                       <div className="space-y-2">
-                        {result.positions.slice(0, 4).map((pos, idx) => {
+                        {result.positions.map((pos, idx) => {
                           const location = getPositionOnPerimeter(pos);
+                          const nextPos = result.positions[(idx + 1) % result.positions.length];
+                          let distanceToNext = nextPos - pos;
+                          if (distanceToNext < 0) distanceToNext += result.perimeter;
+                          
                           return (
-                            <div key={idx} className="bg-muted/50 p-2 rounded text-sm font-mono flex justify-between">
-                              <span>№{idx + 1}:</span>
-                              <span className="font-bold">
-                                {location.side === 'top' && `⭢ ${Math.round(location.x)} мм от левого края`}
-                                {location.side === 'right' && `⭣ ${Math.round(location.y)} мм от верхнего края`}
-                                {location.side === 'bottom' && `⭠ ${Math.round(parseFloat(width) - location.x)} мм от правого края`}
-                                {location.side === 'left' && `⭡ ${Math.round(parseFloat(height) - location.y)} мм от нижнего края`}
-                              </span>
+                            <div key={idx} className="bg-muted/50 p-3 rounded text-sm space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-primary">№{idx + 1}</span>
+                                <span className="text-xs text-muted-foreground">→ {Math.round(distanceToNext)} мм до №{((idx + 1) % result.positions.length) + 1}</span>
+                              </div>
+                              <div className="font-mono text-xs">
+                                {location.side === 'top' && `⭢ Верх: ${Math.round(location.x)} мм от левого края`}
+                                {location.side === 'right' && `⭣ Право: ${Math.round(location.y)} мм от верхнего края`}
+                                {location.side === 'bottom' && `⭠ Низ: ${Math.round(parseFloat(width) - location.x)} мм от правого края`}
+                                {location.side === 'left' && `⭡ Лево: ${Math.round(parseFloat(height) - location.y)} мм от нижнего края`}
+                              </div>
                             </div>
                           );
                         })}
@@ -364,13 +397,23 @@ const Index = () => {
                       </defs>
                       
                       <rect
+                        x="-15"
+                        y="-15"
+                        width={parseFloat(width) + 30}
+                        height={parseFloat(height) + 30}
+                        fill="hsl(var(--muted))"
+                        stroke="hsl(var(--foreground))"
+                        strokeWidth="15"
+                        rx="5"
+                      />
+                      
+                      <rect
                         x="0"
                         y="0"
                         width={parseFloat(width)}
                         height={parseFloat(height)}
-                        fill="hsl(var(--muted) / 0.3)"
-                        stroke="hsl(var(--foreground))"
-                        strokeWidth="3"
+                        fill="hsl(var(--background))"
+                        stroke="none"
                       />
                       
                       <line
@@ -444,14 +487,27 @@ const Index = () => {
                               strokeDasharray="2,2"
                             />
                             
-                            <circle
-                              cx={location.x}
-                              cy={location.y}
-                              r="6"
-                              fill="hsl(var(--primary))"
-                              stroke="hsl(var(--background))"
-                              strokeWidth="2"
-                            />
+                            {grommetsType === '16' ? (
+                              <circle
+                                cx={location.x}
+                                cy={location.y}
+                                r="8"
+                                fill="hsl(var(--primary))"
+                                stroke="hsl(var(--background))"
+                                strokeWidth="3"
+                              />
+                            ) : (
+                              <ellipse
+                                cx={location.x}
+                                cy={location.y}
+                                rx="12"
+                                ry="7"
+                                fill="hsl(var(--primary))"
+                                stroke="hsl(var(--background))"
+                                strokeWidth="3"
+                                transform={`rotate(${location.side === 'top' || location.side === 'bottom' ? 0 : 90}, ${location.x}, ${location.y})`}
+                              />
+                            )}
                             
                             <circle
                               cx={labelX}

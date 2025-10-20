@@ -334,47 +334,138 @@ const Index = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Icon name="Layout" size={20} />
-                    Схема размещения люверсов
+                    Предварительный чертеж
                   </CardTitle>
                   <CardDescription>
-                    Визуализация расположения люверсов по периметру изделия
+                    Визуализация расположения люверсов с нумерацией и размерами
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full overflow-x-auto">
                     <svg
-                      viewBox={`-50 -50 ${parseFloat(width) + 100} ${parseFloat(height) + 100}`}
+                      viewBox={`-100 -100 ${parseFloat(width) + 200} ${parseFloat(height) + 200}`}
                       className="w-full h-auto border-2 border-border bg-card rounded-md"
-                      style={{ maxHeight: '600px' }}
+                      style={{ maxHeight: '700px' }}
                     >
+                      <defs>
+                        <marker
+                          id="arrowhead"
+                          markerWidth="10"
+                          markerHeight="10"
+                          refX="9"
+                          refY="3"
+                          orient="auto"
+                        >
+                          <polygon
+                            points="0 0, 10 3, 0 6"
+                            fill="hsl(var(--muted-foreground))"
+                          />
+                        </marker>
+                      </defs>
+                      
                       <rect
                         x="0"
                         y="0"
                         width={parseFloat(width)}
                         height={parseFloat(height)}
-                        fill="none"
+                        fill="hsl(var(--muted) / 0.3)"
                         stroke="hsl(var(--foreground))"
-                        strokeWidth="2"
-                        strokeDasharray="10,5"
+                        strokeWidth="3"
                       />
+                      
+                      <line
+                        x1="-80"
+                        y1="0"
+                        x2="-80"
+                        y2={parseFloat(height)}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth="1.5"
+                        markerEnd="url(#arrowhead)"
+                        markerStart="url(#arrowhead)"
+                      />
+                      <text
+                        x="-85"
+                        y={parseFloat(height) / 2}
+                        fill="hsl(var(--foreground))"
+                        fontSize="16"
+                        fontWeight="bold"
+                        textAnchor="end"
+                        dominantBaseline="middle"
+                      >
+                        {height} мм
+                      </text>
+                      
+                      <line
+                        x1="0"
+                        y1={parseFloat(height) + 80}
+                        x2={parseFloat(width)}
+                        y2={parseFloat(height) + 80}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth="1.5"
+                        markerEnd="url(#arrowhead)"
+                        markerStart="url(#arrowhead)"
+                      />
+                      <text
+                        x={parseFloat(width) / 2}
+                        y={parseFloat(height) + 95}
+                        fill="hsl(var(--foreground))"
+                        fontSize="16"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                      >
+                        {width} мм
+                      </text>
                       
                       {result.positions.map((pos, idx) => {
                         const location = getPositionOnPerimeter(pos);
+                        const labelOffset = 25;
+                        let labelX = location.x;
+                        let labelY = location.y;
+                        
+                        if (location.side === 'top') {
+                          labelY = location.y - labelOffset;
+                        } else if (location.side === 'bottom') {
+                          labelY = location.y + labelOffset;
+                        } else if (location.side === 'left') {
+                          labelX = location.x - labelOffset;
+                        } else if (location.side === 'right') {
+                          labelX = location.x + labelOffset;
+                        }
+                        
                         return (
                           <g key={idx}>
+                            <line
+                              x1={location.x}
+                              y1={location.y}
+                              x2={labelX}
+                              y2={labelY}
+                              stroke="hsl(var(--muted-foreground))"
+                              strokeWidth="1"
+                              strokeDasharray="2,2"
+                            />
+                            
                             <circle
                               cx={location.x}
                               cy={location.y}
-                              r="8"
+                              r="6"
                               fill="hsl(var(--primary))"
-                              stroke="hsl(var(--primary-foreground))"
+                              stroke="hsl(var(--background))"
                               strokeWidth="2"
                             />
+                            
+                            <circle
+                              cx={labelX}
+                              cy={labelY}
+                              r="14"
+                              fill="hsl(var(--primary))"
+                              stroke="hsl(var(--foreground))"
+                              strokeWidth="1.5"
+                            />
                             <text
-                              x={location.x}
-                              y={location.y}
+                              x={labelX}
+                              y={labelY}
                               fill="hsl(var(--primary-foreground))"
-                              fontSize="10"
+                              fontSize="11"
                               fontWeight="bold"
                               textAnchor="middle"
                               dominantBaseline="central"
